@@ -1,8 +1,12 @@
 package com.foodapi.foodapi.controller;
 
+import com.foodapi.foodapi.model.AuthRequest;
+import com.foodapi.foodapi.model.AuthResponse;
 import com.foodapi.foodapi.model.User;
+import com.foodapi.foodapi.service.JwtService;
 import com.foodapi.foodapi.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,33 +21,26 @@ public class UserController {
     @Autowired
     private UserService userService;
 
-    @Operation(
-        summary = "Register a new user",
-        description = "This operation registers a new user in the system",
-        responses = {
+    @Operation(summary = "Register a new user", description = "This operation registers a new user in the system", responses = {
             @ApiResponse(responseCode = "200", description = "User registered successfully!"),
             @ApiResponse(responseCode = "400", description = "Username already exists!")
-        }
-    )
+    })
 
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@RequestBody User user) {
+    public ResponseEntity<?> registerUser(@RequestBody User user) {
         if (userService.findByUsername(user.getUsername()) != null) {
             return ResponseEntity.status(400).body("Username already exists!");
         }
 
         userService.saveUser(user); // Assuming you have logic to save the user
-        return ResponseEntity.ok("User registered successfully!");
+        String token = jwtService.generateToken(user.getEmail());
+        return ResponseEntity.ok(new AuthResponse(token));
     }
 
-    @Operation(
-        summary = "Check if a user exists",
-        description = "Checks if a user exists in the system by username",
-        responses = {
+    @Operation(summary = "Check if a user exists", description = "Checks if a user exists in the system by username", responses = {
             @ApiResponse(responseCode = "200", description = "User exists!"),
             @ApiResponse(responseCode = "404", description = "User not found!")
-        }
-    )
+    })
     @GetMapping("/exists/{username}")
     public ResponseEntity<String> checkIfUserExists(@PathVariable String username) {
         if (userService.findByUsername(username) != null) {
@@ -53,23 +50,23 @@ public class UserController {
         }
     }
 
-    @Operation(
-        summary = "Login a user",
-        description = "Authenticates the user based on the username and password",
-        responses = {
-            @ApiResponse(responseCode = "200", description = "Login successful!"),
-            @ApiResponse(responseCode = "400", description = "Invalid username or password!")
-        }
-    )
+    @Autowired
+    private JwtService jwtService;
+
     @PostMapping("/login")
-    public String login(@RequestParam String username, @RequestParam String password) {
-        boolean authenticated = userService.authenticate(username, password);
-        System.err.println("hintinh");
+    @Operation(summary = "Login a user", description = "Authenticates the user and returns a JWT token", responses = {
+            @ApiResponse(responseCode = "200", description = "Login successful! JWT token returned"),
+            @ApiResponse(responseCode = "401", description = "Invalid username or password")
+    })
+    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest authRequest) {
+        boolean authenticated = userService.authenticate(authRequest.getEmail(), authRequest.getPassword());
 
         if (authenticated) {
-            return "Login successful!";
+            String token = jwtService.generateToken(authRequest.getEmail());
+            return ResponseEntity.ok(new AuthResponse(token));
         } else {
-            return "Invalid username or password!";
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
     }
+
 }
