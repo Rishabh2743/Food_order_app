@@ -57,3 +57,4 @@ public class User {
 }
 
 
+// AuthResponse.java
